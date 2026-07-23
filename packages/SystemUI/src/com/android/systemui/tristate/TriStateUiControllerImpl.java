@@ -41,6 +41,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.Settings;
 import android.util.DisplayUtils;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
@@ -68,7 +69,7 @@ public class TriStateUiControllerImpl implements TriStateUiController,
     private static String TAG = "TriStateUiControllerImpl";
 
     public static final String ALERT_SLIDER_NOTIFICATIONS =
-            "system:alert_slider_notifications";
+            "system:" + Settings.System.ALERT_SLIDER_NOTIFICATIONS;
 
     private static final int MSG_DIALOG_SHOW = 1;
     private static final int MSG_DIALOG_DISMISS = 2;
@@ -262,7 +263,7 @@ public class TriStateUiControllerImpl implements TriStateUiController,
             ConfigurationController configurationController,
             TunerService tunerService) {
         mContext =
-                new ContextThemeWrapper(context, R.style.Theme_SystemUI_QuickSettings);
+                new ContextThemeWrapper(context, R.style.qs_theme);
         mVolumeDialogController = volumeDialogController;
         mConfigurationController = configurationController;
         mTunerService = tunerService;
@@ -337,7 +338,7 @@ public class TriStateUiControllerImpl implements TriStateUiController,
             mDialog.dismiss();
             mDialog = null;
         }
-        mDialog = new Dialog(mContext, R.style.Theme_SystemUI_QuickSettings);
+        mDialog = new Dialog(mContext, R.style.qs_theme);
         mShowing = false;
         mWindow = mDialog.getWindow();
         mWindow.requestFeature(Window.FEATURE_NO_TITLE);
