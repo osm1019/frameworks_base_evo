@@ -32,6 +32,8 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Trace
+import android.os.UserHandle
+import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.text.TextUtils
 import android.util.Log
@@ -71,6 +73,7 @@ import com.android.systemui.qs.logging.QSLogger
 import com.android.systemui.qs.tileimpl.QSIconViewImpl.QS_ANIM_LENGTH
 import com.android.systemui.res.R
 import java.util.Objects
+import java.util.Random
 
 private const val TAG = "QSTileViewImpl"
 
@@ -90,6 +93,10 @@ constructor(
         private const val CHEVRON_NAME = "chevron"
         private const val OVERLAY_NAME = "overlay"
         const val UNAVAILABLE_ALPHA = 0.3f
+        const val COLOR_POP_ACTIVE_ALPHA = 0.2f
+        private const val COLOR_POP_INACTIVE_ALPHA = 0.35f
+        /** Dark content for Color Pop inactive (unpressed) tiles. */
+        private const val COLOR_POP_INACTIVE_CONTENT = 0xFF1A1A1A.toInt()
         @VisibleForTesting internal const val TILE_STATE_RES_PREFIX = "tile_states_"
         @VisibleForTesting internal const val LONG_PRESS_EFFECT_WIDTH_SCALE = 1.1f
         @VisibleForTesting internal const val LONG_PRESS_EFFECT_HEIGHT_SCALE = 1.2f
@@ -119,6 +126,27 @@ constructor(
             field = value
             updateHeight()
         }
+
+    private val qsColorPop: Boolean =
+        Settings.System.getIntForUser(
+            context.contentResolver,
+            Settings.System.QS_COLOR_POP,
+            0,
+            UserHandle.USER_CURRENT,
+        ) != 0
+
+    private val randomTint: Int = run {
+        val random = Random()
+        Color.HSVToColor(
+            floatArrayOf(
+                random.nextFloat() * 360f,
+                0.55f + random.nextFloat() * 0.35f,
+                0.70f + random.nextFloat() * 0.25f,
+            )
+        )
+    }
+    private val colorActiveRandom = Utils.applyAlpha(COLOR_POP_ACTIVE_ALPHA, randomTint)
+    private val colorInactiveAlpha = Color.argb((COLOR_POP_INACTIVE_ALPHA * 255).toInt(), 255, 255, 255)
 
     private val colorActive = Utils.getColorAttrDefaultColor(context, R.attr.shadeActive)
     private val colorInactive = Utils.getColorAttrDefaultColor(context, R.attr.shadeInactive)
@@ -876,8 +904,8 @@ constructor(
     private fun getBackgroundColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorUnavailable
-            state == Tile.STATE_ACTIVE -> colorActive
-            state == Tile.STATE_INACTIVE -> colorInactive
+            state == Tile.STATE_ACTIVE -> if (qsColorPop) colorActiveRandom else colorActive
+            state == Tile.STATE_INACTIVE -> if (qsColorPop) colorInactiveAlpha else colorInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0
@@ -888,8 +916,10 @@ constructor(
     private fun getLabelColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorLabelUnavailable
-            state == Tile.STATE_ACTIVE -> colorLabelActive
-            state == Tile.STATE_INACTIVE -> colorLabelInactive
+            state == Tile.STATE_ACTIVE -> if (qsColorPop) randomTint else colorLabelActive
+            // Dark unpressed labels only when Color Pop is enabled.
+            state == Tile.STATE_INACTIVE ->
+                if (qsColorPop) COLOR_POP_INACTIVE_CONTENT else colorLabelInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0
@@ -900,8 +930,10 @@ constructor(
     private fun getSecondaryLabelColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorSecondaryLabelUnavailable
-            state == Tile.STATE_ACTIVE -> colorSecondaryLabelActive
-            state == Tile.STATE_INACTIVE -> colorSecondaryLabelInactive
+            state == Tile.STATE_ACTIVE -> if (qsColorPop) randomTint else colorSecondaryLabelActive
+            // Dark unpressed labels only when Color Pop is enabled.
+            state == Tile.STATE_INACTIVE ->
+                if (qsColorPop) COLOR_POP_INACTIVE_CONTENT else colorSecondaryLabelInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0

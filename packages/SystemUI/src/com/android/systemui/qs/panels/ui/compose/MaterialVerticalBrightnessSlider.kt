@@ -73,7 +73,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+import androidx.compose.ui.graphics.Color
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.ColorPopInactiveContent
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CustomColorScheme
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopContentOnFill
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopTint
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.rememberQsColorPop
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.rememberTileHaptic
 import com.android.systemui.volume.dialog.sliders.ui.compose.rememberGradientColorMode
 import com.android.systemui.volume.dialog.sliders.ui.compose.rememberGradientCustomColors
@@ -170,17 +175,26 @@ fun MaterialVerticalBrightnessSlider(
         onDispose { cr.unregisterContentObserver(observer) }
     }
 
+    val colorPop = rememberQsColorPop()
+    val popTint = remember { colorPopTint("qs_brightness_slider") }
+    val popContent = remember(popTint) { colorPopContentOnFill(popTint) }
+
     val fillColor by animateColorAsState(
-        targetValue = MaterialTheme.colorScheme.primary,
+        targetValue = if (colorPop) popTint else MaterialTheme.colorScheme.primary,
         animationSpec = tween(300),
         label = "BrightnessFill",
     )
     val iconTint by animateColorAsState(
-        targetValue = MaterialTheme.colorScheme.onPrimary,
+        targetValue = when {
+            // Color Pop: dark icon on the track before the fill covers it; contrast on fill.
+            colorPop && currentFraction < 0.12f -> ColorPopInactiveContent
+            colorPop -> popContent
+            else -> MaterialTheme.colorScheme.onPrimary
+        },
         animationSpec = tween(300),
         label = "BrightnessIconTint",
     )
-    val gradientEnabled = rememberVolumeGradientEnabled()
+    val gradientEnabled = rememberVolumeGradientEnabled() && !colorPop
     val gradientColors = if (rememberGradientColorMode() == 1) {
         val g = rememberGradientCustomColors()
         listOf(g.startColor, g.endColor)
@@ -199,7 +213,9 @@ fun MaterialVerticalBrightnessSlider(
     val cornerRadius = if (rounded) CORNER_ROUNDED else CORNER_DEFAULT
     val shape = RoundedCornerShape(cornerRadius)
     val fillShape = RoundedCornerShape(if (rounded) CORNER_INNER else CORNER_DEFAULT)
-    val trackBg  = CustomColorScheme.current.qsTileColor
+    val trackBg =
+        if (colorPop) Color.White.copy(alpha = 0.35f)
+        else CustomColorScheme.current.qsTileColor
 
     fun yToLinear(y: Float, heightPx: Int): Float {
         val fraction = 1f - (y / heightPx).coerceIn(0f, 1f)

@@ -875,6 +875,65 @@ fun rememberQSPanelStyle(): Boolean {
 }
 
 @Composable
+fun rememberQsColorPop(): Boolean {
+    val context = LocalContext.current
+    val contentResolver = context.contentResolver
+
+    fun readColorPopEnabled(): Boolean {
+        return try {
+            Settings.System.getIntForUser(
+                contentResolver, Settings.System.QS_COLOR_POP, 0,
+                UserHandle.USER_CURRENT
+            ) != 0
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    var colorPopEnabled by remember { mutableStateOf(readColorPopEnabled()) }
+
+    DisposableEffect(contentResolver) {
+        val observer = object : ContentObserver(null) {
+            override fun onChange(selfChange: Boolean) {
+                context.mainExecutor.execute {
+                    colorPopEnabled = readColorPopEnabled()
+                }
+            }
+        }
+
+        contentResolver.registerContentObserver(
+            Settings.System.getUriFor(Settings.System.QS_COLOR_POP),
+            false, observer, UserHandle.USER_ALL
+        )
+
+        onDispose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+
+    return colorPopEnabled
+}
+
+/** Stable per-seed random accent, matching legacy Color Pop intent. */
+internal fun colorPopTint(seed: String): Color {
+    val rnd = java.util.Random(seed.hashCode().toLong())
+    // Keep colors vivid enough to read as labels/icons on a translucent fill.
+    val hue = rnd.nextFloat() * 360f
+    val saturation = 0.55f + rnd.nextFloat() * 0.35f
+    val value = 0.70f + rnd.nextFloat() * 0.25f
+    return Color.hsv(hue, saturation, value)
+}
+
+/** Dark icon/label color for Color Pop inactive (unpressed) tiles and slider tracks. */
+internal val ColorPopInactiveContent = Color(0xFF1A1A1A)
+
+/** Contrasting glyph color on a solid Color Pop fill. */
+internal fun colorPopContentOnFill(fill: Color): Color {
+    val luminance = 0.299f * fill.red + 0.587f * fill.green + 0.114f * fill.blue
+    return if (luminance > 0.55f) ColorPopInactiveContent else Color.White
+}
+
+@Composable
 fun rememberQSTileLabelHide(): Boolean {
     val context = LocalContext.current
     val contentResolver = context.contentResolver
@@ -962,10 +1021,15 @@ fun rememberQSTileIconShapeKey(): String {
 
 private object TileDefaults {
     val ActiveIconCornerRadius = 16.dp
+    private const val COLOR_POP_ACTIVE_ALPHA = 0.2f
+    private const val COLOR_POP_INACTIVE_ALPHA = 0.35f
 
     /** An active tile uses the active color as background */
     @Composable
-    fun activeTileColors(): TileColors {
+    fun activeTileColors(seed: String = ""): TileColors {
+        if (rememberQsColorPop()) {
+            return colorPopActiveTileColors(seed)
+        }
         val gradientEnabled = rememberQsGradient()
         val gradient = qsTileBackgroundBrush(gradientEnabled)
 
@@ -982,7 +1046,19 @@ private object TileDefaults {
 
     /** An active tile with dual target only show the active color on the icon */
     @Composable
-    fun activeDualTargetTileColors(): TileColors {
+    fun activeDualTargetTileColors(seed: String = ""): TileColors {
+        if (rememberQsColorPop()) {
+            val tint = remember(seed) { colorPopTint(seed) }
+            val bg = tint.copy(alpha = COLOR_POP_ACTIVE_ALPHA)
+            return TileColors(
+                background = CustomColorScheme.current.qsTileColor,
+                iconBackground = bg,
+                label = MaterialTheme.colorScheme.onSurface,
+                secondaryLabel = MaterialTheme.colorScheme.onSurface,
+                icon = tint,
+                outline = tint,
+            )
+        }
         val gradientEnabled = rememberQsGradient()
         val gradient = qsTileBackgroundBrush(gradientEnabled)
 
@@ -998,9 +1074,35 @@ private object TileDefaults {
     }
 
     @Composable
-    @ReadOnlyComposable
-    fun inactiveDualTargetTileColors(): TileColors =
-        TileColors(
+    fun colorPopActiveTileColors(seed: String): TileColors {
+        val tint = remember(seed) { colorPopTint(seed) }
+        val bg = tint.copy(alpha = COLOR_POP_ACTIVE_ALPHA)
+        return TileColors(
+            background = bg,
+            iconBackground = bg,
+            label = tint,
+            secondaryLabel = tint,
+            icon = tint,
+            outline = tint,
+        )
+    }
+
+    @Composable
+    fun inactiveDualTargetTileColors(): TileColors {
+        // Dark unpressed icons/labels only when Color Pop is enabled.
+        val colorPop = rememberQsColorPop()
+        if (colorPop) {
+            val content = ColorPopInactiveContent
+            return TileColors(
+                background = Color.White.copy(alpha = COLOR_POP_INACTIVE_ALPHA),
+                iconBackground = LocalAndroidColorScheme.current.surfaceEffect2,
+                label = content,
+                secondaryLabel = content,
+                icon = content,
+                outline = content,
+            )
+        }
+        return TileColors(
             background = CustomColorScheme.current.qsTileColor,
             iconBackground = LocalAndroidColorScheme.current.surfaceEffect2,
             label = MaterialTheme.colorScheme.onSurface,
@@ -1008,11 +1110,24 @@ private object TileDefaults {
             icon = MaterialTheme.colorScheme.onSurface,
             outline = MaterialTheme.colorScheme.onSurface,
         )
+    }
 
     @Composable
-    @ReadOnlyComposable
-    fun inactiveTileColors(): TileColors =
-        TileColors(
+    fun inactiveTileColors(): TileColors {
+        // Dark unpressed icons/labels only when Color Pop is enabled.
+        val colorPop = rememberQsColorPop()
+        if (colorPop) {
+            val content = ColorPopInactiveContent
+            return TileColors(
+                background = Color.White.copy(alpha = COLOR_POP_INACTIVE_ALPHA),
+                iconBackground = Color.Transparent,
+                label = content,
+                secondaryLabel = content,
+                icon = content,
+                outline = content,
+            )
+        }
+        return TileColors(
             background = CustomColorScheme.current.qsTileColor,
             iconBackground = Color.Transparent,
             label = MaterialTheme.colorScheme.onSurface,
@@ -1020,6 +1135,7 @@ private object TileDefaults {
             icon = MaterialTheme.colorScheme.onSurface,
             outline = MaterialTheme.colorScheme.onSurface,
         )
+    }
 
     @Composable
     @ReadOnlyComposable
@@ -1038,12 +1154,13 @@ private object TileDefaults {
 
     @Composable
     fun getColorForState(uiState: TileUiState, iconOnly: Boolean): TileColors {
+        val seed = uiState.label
         return when (uiState.state) {
             STATE_ACTIVE -> {
                 if (uiState.handlesSecondaryClick && !iconOnly) {
-                    activeDualTargetTileColors()
+                    activeDualTargetTileColors(seed)
                 } else {
-                    activeTileColors()
+                    activeTileColors(seed)
                 }
             }
 

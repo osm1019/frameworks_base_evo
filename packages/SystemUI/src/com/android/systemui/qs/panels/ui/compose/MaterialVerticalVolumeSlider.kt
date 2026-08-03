@@ -65,7 +65,12 @@ import com.android.systemui.res.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import androidx.compose.ui.graphics.Color
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.ColorPopInactiveContent
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CustomColorScheme
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopContentOnFill
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopTint
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.rememberQsColorPop
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.rememberTileHaptic
 import com.android.systemui.volume.dialog.sliders.ui.compose.rememberGradientColorMode
 import com.android.systemui.volume.dialog.sliders.ui.compose.rememberGradientCustomColors
@@ -163,25 +168,35 @@ fun MaterialVerticalVolumeSlider(
         view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     }
 
+    val colorPop = rememberQsColorPop()
+    val popTint = remember { colorPopTint("qs_volume_slider") }
+    val popContent = remember(popTint) { colorPopContentOnFill(popTint) }
+
     val fillColor by animateColorAsState(
-        targetValue = when (ringerMode) {
-            AudioManager.RINGER_MODE_SILENT -> MaterialTheme.colorScheme.tertiaryContainer
-            AudioManager.RINGER_MODE_VIBRATE -> MaterialTheme.colorScheme.tertiaryContainer
+        targetValue = when {
+            ringerMode == AudioManager.RINGER_MODE_SILENT ||
+                ringerMode == AudioManager.RINGER_MODE_VIBRATE ->
+                MaterialTheme.colorScheme.tertiaryContainer
+            colorPop -> popTint
             else -> MaterialTheme.colorScheme.primary
         },
         animationSpec = tween(350),
         label = "VolumeFill",
     )
     val iconTint by animateColorAsState(
-        targetValue = when (ringerMode) {
-            AudioManager.RINGER_MODE_SILENT -> MaterialTheme.colorScheme.onTertiaryContainer
-            AudioManager.RINGER_MODE_VIBRATE -> MaterialTheme.colorScheme.onTertiaryContainer
+        targetValue = when {
+            ringerMode == AudioManager.RINGER_MODE_SILENT ||
+                ringerMode == AudioManager.RINGER_MODE_VIBRATE ->
+                MaterialTheme.colorScheme.onTertiaryContainer
+            // Color Pop: dark icon on the track before the fill covers it; contrast on fill.
+            colorPop && currentFraction < 0.12f -> ColorPopInactiveContent
+            colorPop -> popContent
             else -> MaterialTheme.colorScheme.onPrimary
         },
         animationSpec = tween(350),
         label = "VolumeIconTint",
     )
-    val gradientEnabled = rememberVolumeGradientEnabled()
+    val gradientEnabled = rememberVolumeGradientEnabled() && !colorPop
     val normalGradientColors = if (rememberGradientColorMode() == 1) {
         val g = rememberGradientCustomColors()
         listOf(g.startColor, g.endColor)
@@ -211,7 +226,8 @@ fun MaterialVerticalVolumeSlider(
     }
 
     val tileColor = CustomColorScheme.current.qsTileColor
-    val trackBg = tileColor
+    val trackBg =
+        if (colorPop) Color.White.copy(alpha = 0.35f) else tileColor
     val cornerRadius = if (rounded) CORNER_ROUNDED else CORNER_DEFAULT
     val shape = RoundedCornerShape(cornerRadius)
     val fillShape = RoundedCornerShape(if (rounded) CORNER_INNER else CORNER_DEFAULT)

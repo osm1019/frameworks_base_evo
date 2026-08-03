@@ -27,9 +27,12 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.graphics.drawable.Animatable2;
 import android.graphics.drawable.Animatable2.AnimationCallback;
 import android.graphics.drawable.Drawable;
+import android.os.UserHandle;
+import android.provider.Settings;
 import android.service.quicksettings.Tile;
 import android.util.Log;
 import android.view.View;
@@ -45,6 +48,7 @@ import com.android.systemui.plugins.qs.QSTile.State;
 import com.android.systemui.res.R;
 
 import java.util.Objects;
+import java.util.Random;
 
 public class QSIconViewImpl extends QSIconView {
 
@@ -79,7 +83,10 @@ public class QSIconViewImpl extends QSIconView {
 
         if (qsNewTiles()) { // pre-load icon tint colors
             mColorUnavailable = Utils.getColorAttrDefaultColor(context, R.attr.outline);
-            mColorInactive = Utils.getColorAttrDefaultColor(context, R.attr.onShadeInactiveVariant);
+            // Color Pop inactive: dark icons before the tile is pressed.
+            mColorInactive = isQsColorPopEnabled(context)
+                    ? COLOR_POP_INACTIVE_CONTENT
+                    : Utils.getColorAttrDefaultColor(context, R.attr.onShadeInactiveVariant);
             mColorActive = Utils.getColorAttrDefaultColor(context, R.attr.onShadeActive);
         }
 
@@ -269,12 +276,32 @@ public class QSIconViewImpl extends QSIconView {
     /**
      * Color to tint the tile icon based on state
      */
+    private static final int COLOR_POP_INACTIVE_CONTENT = 0xFF1A1A1A;
+
+    private static boolean isQsColorPopEnabled(Context context) {
+        return Settings.System.getIntForUser(context.getContentResolver(),
+                Settings.System.QS_COLOR_POP, 0, UserHandle.USER_CURRENT) != 0;
+    }
+
     private static int getIconColorForState(Context context, QSTile.State state) {
         if (state.disabledByPolicy || state.state == Tile.STATE_UNAVAILABLE) {
             return Utils.getColorAttrDefaultColor(context, R.attr.outline);
         } else if (state.state == Tile.STATE_INACTIVE) {
+            // Dark unpressed icons only when Color Pop is enabled.
+            if (isQsColorPopEnabled(context)) {
+                return COLOR_POP_INACTIVE_CONTENT;
+            }
             return Utils.getColorAttrDefaultColor(context, R.attr.onShadeInactiveVariant);
         } else if (state.state == Tile.STATE_ACTIVE) {
+            if (isQsColorPopEnabled(context)) {
+                Random random = new Random();
+                float[] hsv = new float[] {
+                        random.nextFloat() * 360f,
+                        0.55f + random.nextFloat() * 0.35f,
+                        0.70f + random.nextFloat() * 0.25f
+                };
+                return Color.HSVToColor(hsv);
+            }
             return Utils.getColorAttrDefaultColor(context, R.attr.onShadeActive);
         } else {
             Log.e("QSIconView", "Invalid state " + state);

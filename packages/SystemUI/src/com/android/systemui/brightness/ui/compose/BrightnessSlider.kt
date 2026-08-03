@@ -135,7 +135,11 @@ import com.android.systemui.haptics.slider.SeekableSliderTrackerConfig
 import com.android.systemui.haptics.slider.SliderHapticFeedbackConfig
 import com.android.systemui.haptics.slider.compose.ui.SliderHapticsViewModel
 import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.ColorPopInactiveContent
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CustomColorScheme
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopContentOnFill
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.colorPopTint
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.rememberQsColorPop
 import com.android.systemui.qs.ui.compose.borderOnFocus
 import com.android.systemui.res.R
 import com.android.systemui.utils.PolicyRestriction
@@ -178,8 +182,11 @@ fun BrightnessSlider(
 
     val trackShape = RoundedCornerShape(trackCornerDp)
     val brightnessGradient = brightnessSliderGradient()
+    val colors = colors(brightnessGradient, seed = "qs_brightness_slider")
     val thumbColorOverride: Color? =
-        if (!rememberSliderGradient()) {
+        if (rememberQsColorPop()) {
+            colors.thumbColor
+        } else if (!rememberSliderGradient()) {
             null
         } else if (rememberGradientColorMode() == 1) {
             val (customStart, _) = rememberGradientCustomColors()
@@ -212,7 +219,6 @@ fun BrightnessSlider(
         } else {
             null
         }
-    val colors = colors(brightnessGradient)
 
     // The value state is recreated every time gammaValue changes, so we recreate this derivedState
     // We have to use value as that's the value that changes when the user is dragging (gammaValue
@@ -733,7 +739,8 @@ private fun rememberGradientCustomColors(): Pair<Color, Color> {
 
 @Composable
 private fun brightnessSliderGradient(): BrightnessGradient? {
-    if (!rememberSliderGradient()) return null
+    // Color Pop uses solid random accents; skip gradient so it can show through.
+    if (rememberQsColorPop() || !rememberSliderGradient()) return null
 
     val mode = rememberGradientColorMode()
     val colors = if (mode == 1) {
@@ -1151,11 +1158,13 @@ private fun VolumeSlider(
         }
     val trackShape = RoundedCornerShape(trackCornerDp)
     val gradient = brightnessSliderGradient()
-    val colors = colors(gradient)
+    val colors = colors(gradient, seed = "qs_volume_slider")
     val activeIconColor = colors.activeTickColor
     val inactiveIconColor = colors.inactiveTickColor
     val thumbColorOverride: Color? =
-        if (!rememberSliderGradient()) {
+        if (rememberQsColorPop()) {
+            colors.thumbColor
+        } else if (!rememberSliderGradient()) {
             null
         } else if (rememberGradientColorMode() == 1) {
             val (customStart, _) = rememberGradientCustomColors()
@@ -1475,8 +1484,23 @@ object BrightnessSliderMotionTestKeys {
 }
 
 @Composable
-private fun colors(brightnessGradient: BrightnessGradient?): SliderColors {
+private fun colors(
+    brightnessGradient: BrightnessGradient?,
+    seed: String = "qs_brightness_slider",
+): SliderColors {
     val base = SliderDefaults.colors()
+    // Color Pop accents (and dark unpressed icons) only when the setting is on.
+    if (rememberQsColorPop()) {
+        val popTint = remember(seed) { colorPopTint(seed) }
+        val popContent = remember(popTint) { colorPopContentOnFill(popTint) }
+        return base.copy(
+            thumbColor = popTint,
+            activeTrackColor = popTint,
+            inactiveTrackColor = Color.White.copy(alpha = 0.35f),
+            activeTickColor = popContent,
+            inactiveTickColor = ColorPopInactiveContent,
+        )
+    }
     return base
         .copy(
             activeTrackColor = if (brightnessGradient != null) Color.Transparent else base.activeTrackColor,

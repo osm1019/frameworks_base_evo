@@ -7821,6 +7821,12 @@ public final class Settings {
         public static final String QS_TILE_ALTERNATE_COLOR = "qs_tile_alternate_color";
 
         /**
+         * Whether to use Color Pop QS tile styling (per-tile random accent colors when active)
+         * @hide
+         */
+        public static final String QS_COLOR_POP = "qs_color_pop";
+
+        /**
          * What to show at the bottom of the Ambient display
          * 0: Nothing.
          * 1: Battery Percentage.

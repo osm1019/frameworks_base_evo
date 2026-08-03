@@ -208,7 +208,8 @@ fun ClassicTileContent(
         }
 
         if (!labelHide) {
-            val labelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+            // Use tile colors so Color Pop inactive can show dark labels before press.
+            val labelColor = colors.label.copy(alpha = 0.9f)
             BasicText(
                 text = label,
                 style = TextStyle(
