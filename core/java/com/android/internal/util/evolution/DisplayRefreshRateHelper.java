@@ -62,6 +62,12 @@ public class DisplayRefreshRateHelper {
         final float defaultRefreshRate = refreshRate != 0 ? (float) refreshRate : DEFAULT_REFRESH_RATE;
         final int ret = (int) Settings.System.getFloatForUser(mContext.getContentResolver(),
                 MIN_REFRESH_RATE, defaultRefreshRate, UserHandle.USER_SYSTEM);
+        // 0 (unset/auto) and 1 (LTPO floor) sit below the lowest discrete SF mode
+        // (typically 60). Do not coerce them up to the peak; that would pin the
+        // panel and hide the full adaptive range.
+        if (ret <= 1) {
+            return 1;
+        }
         if (mRefreshRateList.size() != 0 && !mRefreshRateList.contains(ret)) {
             return mRefreshRateList.get(mRefreshRateList.size() - 1);
         }
