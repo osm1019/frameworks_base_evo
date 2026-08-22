@@ -57,11 +57,10 @@ public class DisplayRefreshRateHelper {
     }
 
     public int getMinimumRefreshRate() {
-        final int refreshRate = mContext.getResources().getInteger(
-                R.integer.config_defaultRefreshRate);
-        final float defaultRefreshRate = refreshRate != 0 ? (float) refreshRate : DEFAULT_REFRESH_RATE;
+        // Default 1 Hz (not 60): 60 is a discrete SF mode and pins LTPO. Unset
+        // or Auto must not fall back to 60 or the overlay stays stuck there.
         final int ret = (int) Settings.System.getFloatForUser(mContext.getContentResolver(),
-                MIN_REFRESH_RATE, defaultRefreshRate, UserHandle.USER_SYSTEM);
+                MIN_REFRESH_RATE, 1f, UserHandle.USER_SYSTEM);
         // 0 (unset/auto) and 1 (LTPO floor) sit below the lowest discrete SF mode
         // (typically 60). Do not coerce them up to the peak; that would pin the
         // panel and hide the full adaptive range.
